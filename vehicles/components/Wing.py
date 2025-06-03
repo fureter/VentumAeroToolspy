@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from .Components import Component
-from Aerodynamics.Airfoil import Airfoil
+from aerodynamics.airfoil import Airfoil
 
 
 class Wing(Component):
@@ -138,7 +138,7 @@ class Wing(Component):
 
 
     @property
-    def _area(self):
+    def area(self):
         s = 0
         for inx in range(0, len(self.span)):
             s += self.span[inx]*(self.chord[inx] + self.chord[inx+1])/2
@@ -149,7 +149,7 @@ class Wing(Component):
 
 
     @property
-    def _projected_area(self):
+    def projected_area(self):
         s = 0
         for inx in range(0, len(self.span)):
             s += (self.span[inx] * (self.chord[inx] + self.chord[inx + 1]) / 2) * np.cos(
@@ -161,19 +161,19 @@ class Wing(Component):
 
 
     @property
-    def _mean_aerodynamic_chord(self):
-        mac = self._area / self.total_span()
+    def mean_aerodynamic_chord(self):
+        mac = self.area / self.total_span()
 
         return mac
 
 
     @property
-    def _aspect_ratio(self):
+    def aspect_ratio(self):
         ar = self.total_span()**2 / self.area
         return ar
 
 
-    def planform_coordinates(self):
+    def planform_coordinates(self, half=False):
         len_c = len(self.chord)
         x_init = list()
         top_init = list()
@@ -201,7 +201,7 @@ class Wing(Component):
         for inx in range(len(x_init)-1, 0, -1):
             x.append(x_init[inx])
             y.append(bottom_init[inx])
-        if self.symmetric:
+        if self.symmetric and half is False:
             for inx in range(0, len(x_init)):
                 x.append(-x_init[inx])
                 y.append(bottom_init[inx])
@@ -209,7 +209,7 @@ class Wing(Component):
                 x.append(-x_init[inx])
                 y.append(top_init[inx])
 
-        return (np.array(x), np.array(y))
+        return np.array(x), np.array(y)
 
 
     def plot_wing(self):

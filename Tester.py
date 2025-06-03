@@ -1,46 +1,61 @@
 import logging
 import sys
 
-from Design.Components.Wing import Wing
-from Design.Aircraft import Aircraft
+import matplotlib.pyplot as plt
+import numpy as np
 
 def main():
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(logging.DEBUG)
+    handler.setLevel(logging.INFO)
     logger.addHandler(handler)
 
     logging.getLogger('matplotlib.font_manager').disabled = True
 
-    span = [0.1, 0.9, 0.2, 0.1]
-    chord = [0.2, 0.2, 0.14, 0.1, 0.05]
-    twist = 0
-    sweep = [3, 5, 10, 45]
-    polyhedral = 1
+    directory = r"M:\Projects\OpenFOAM\AE410Midterm"
 
-    span_h = [0.2, 0.1]
-    chord_h = [0.14, 0.10, 0.06]
-    twist_h = 0
-    sweep_h = [10]
-    polyhedral_h = 1
+    t = OpenFOAMUtils.get_time_steps(directory)
+    rho = OpenFOAMUtils.load_from_directory('rho', directory, grid_size=150)
+    p = OpenFOAMUtils.load_from_directory('p', directory, grid_size=150)
+    u = OpenFOAMUtils.load_from_directory('U', directory, grid_size=150, scalar=False)
 
-    wing = Wing(sub_type=Wing.SubType.MAIN_WING, span=span, chord=chord, twist=twist, sweep=sweep,
-                polyhedral=polyhedral, logger=logger)
+    legend = list()
+    for time in t:
+        legend.append('t = %sms' % (time*1E3))
 
-    horz_stab = Wing(sub_type=Wing.SubType.HORZ_STAB, span=span_h, chord=chord_h, twist=twist_h, sweep=sweep_h,
-                polyhedral=polyhedral_h, logger=logger)
+    x_length = 10.0
+    x_resolution = 150
+    x_grid = np.linspace(0, x_length, num=x_resolution, endpoint=False)
 
-    logger.info('Wing Area: %sm²' % wing.area)
-    logger.info('Wing Projected Area: %sm²' % wing.projected_area)
-    logger.info('Wing MAC: %sm' % wing.mac)
-    logger.info('Wing AR: %s' % wing.ar)
+    rho_initial = np.ones(x_resolution) * 1.225
+    u_initial = np.ones(x_resolution) * 100
+    p_initial = 101325 * (1 + 1/20 * np.exp(-10*(x_grid - x_length/2)**2))
 
-    aircraft = Aircraft(name='Yolo Plane', logger=logger)
-    aircraft.add_component(wing, (0,0,0))
-    aircraft.add_component(horz_stab, (-1.2,0,0))
+    rho[0,:] = rho_initial
+    u[0,:] = u_initial
+    p[0,:] = p_initial
 
-    Aircraft.plot_planform(aircraft)
+    plt.subplot(3,1,1)
+    plt.grid(True, which='both')
+    for ind in range(len(t)):
+        plt.plot(x_grid,rho[ind,:])
+    plt.legend(legend)
+    plt.title('Density (kg/m^3)')
+    plt.subplot(3,1,2)
+    plt.grid(True, which='both')
+    for ind in range(len(t)):
+        plt.plot(x_grid,u[ind,:])
+    plt.legend(legend)
+    plt.title('Fluid Velocity (m/s)')
+    plt.subplot(3,1,3)
+    plt.grid(True, which='both')
+    for ind in range(len(t)):
+        plt.plot(x_grid,p[ind,:])
+    plt.legend(legend)
+    plt.title('Pressure (Pa)')
+    plt.show()
 
-main()
+if "__main__" in __name__:
+    main()

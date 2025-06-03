@@ -1,8 +1,6 @@
-import logging
 from matplotlib import pyplot as plt
 
-from .Vehicle import Vehicle
-from .Components.Wing import Wing
+from .vehicle import Vehicle
 
 
 class Aircraft(Vehicle):
@@ -11,14 +9,14 @@ class Aircraft(Vehicle):
 
         super().__init__(name, logger)
 
-    def add_component(self, component, position):
-        self.components.append((component, position))
 
+    def update_forces(self, control_manager, environment_manager):
+        raise NotImplementedError('Not implemented for vehicle type')
 
-    def plot_planform(self):
+    def plot_planform(self, half=False):
         legend = list()
         for com in self.components:
-            (x,y) = com[0].planform_coordinates()
+            (x,y) = com[0].planform_coordinates(half)
             x += com[1][1]
             y += com[1][0]
             plt.plot(x,y)
