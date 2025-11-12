@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from matplotlib import pyplot as plt
 
-from .Components import Component
+from .components import Component
 from aerodynamics.airfoil import Airfoil
 
 
