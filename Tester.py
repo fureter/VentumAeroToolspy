@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from gnc.control_manager import RateController, ControlManager, AttitudeController
 from simulation.simluation import SimulationManager, EnvironmentManager
 from utilities.coordinate_systems import rotation_matrix
-from vehicles.projectile import SimpleDart, SimpleWingedDart
+from vehicles.projectile import SimpleDart, SimpleWingedDart, DeployableWingedDart
 
 # matplotlib.use('AGG')
 import numpy as np
@@ -24,22 +24,22 @@ def main():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     # artillery = SimpleDart(name='100mm', tail_roll=0, tail_chord=0.4, tail_span=0.6)
-    artillery = SimpleWingedDart(name='100mm', tail_roll=0, tail_chord=0.4, tail_span=0.6)
+    artillery = DeployableWingedDart(name='100mm', tail_chord=0.4, tail_span=0.6)
 
     rotation_matrix([np.deg2rad(90),np.deg2rad(45),np.deg2rad(0)])
     launch_angle = np.deg2rad(30)
-    roll_offset = np.deg2rad(-15)
+    roll_offset = np.deg2rad(-45)
     yaw_offset = np.deg2rad(0)
     pitch_offset = np.deg2rad(0)
     launch_vel=50
     simulation_manager = SimulationManager(pos_init=np.array([0,0,0]),
                                            vel_init=np.array([launch_vel*np.cos(launch_angle),0,-launch_vel*np.sin(launch_angle)]),
                                            angle_init=np.array([roll_offset,launch_angle+pitch_offset,yaw_offset]),
-                                           angle_rate_init=np.array([0.0,0.0,0.0]), log=logger,
-                                           sim_rate=100, max_runtime=50)
+                                           angle_rate_init=np.array([15.0 * 2.0 * np.pi,0.0,0.0]), log=logger,
+                                           sim_rate=100, max_runtime=100)
     control_manager = AttitudeController() #ControlManager() #RateController()
     environment_manager = EnvironmentManager()
-    simulate_vehicle(vehicle=artillery, control_manager=control_manager,
+    simulate_vehicle(vehicles=artillery, control_manager=control_manager,
                      environment_manager=environment_manager, simulation_manager=simulation_manager, visualizer=plot_vehicle)
     simulation_manager.plot_velocity()
     simulation_manager.plot_position()

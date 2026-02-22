@@ -57,12 +57,28 @@ class Vehicle(object):
         self.update_inertia_and_mass()
 
     @abc.abstractmethod
-    def calculate_loads_body_frame(self, control_manager, environment_manager, simulation_manager):
+    def update_vehicle(self, control_manager, environment_manager, simulation_manager):
         raise NotImplementedError('Not implemented for vehicle type')
 
-    @abc.abstractmethod
+    def calculate_loads_body_frame(self, control_manager, environment_manager, simulation_manager):
+        force = np.zeros(3)
+        moment = np.zeros(3)
+
+        for component in self.components:
+            f, m = component.calculate_loads_body_frame(self, control_manager, environment_manager, simulation_manager)
+            force += f
+            moment += m
+        self.force = force
+        self.moment = moment
+
+        return force, moment
+
     def calculate_angular_momentum_body_frame(self):
-        raise NotImplementedError('Not implemented for vehicle type')
+        angular_momentum = np.array(np.zeros(3))
+        for component in self.components:
+            angular_momentum += component.calculate_angular_momentum_body_frame(self.ang_rate)
+
+        return angular_momentum
 
     @abc.abstractmethod
     def control_input(self, control_manager):
@@ -83,6 +99,13 @@ class Vehicle(object):
         return np.array([[1.0, 0, -np.sin(self.attitude[1])],
                          [0.0, np.cos(self.attitude[0]), np.sin(self.attitude[0]) * np.cos(self.attitude[1])],
                          [0.0, -np.sin(self.attitude[0]), np.cos(self.attitude[0])*np.cos(self.attitude[1])]])
+
+    @property
+    def body_rate_to_euler_transform(self):
+        att = self.attitude
+        return np.array([[1.0, np.sin(att[0])*np.tan(att[1]), np.cos(att[0])*np.tan(att[1])],
+                         [0.0, np.cos(att[1]), -np.sin(att[0])],
+                         [0.0, np.sin(att[0])/np.cos(att[1]), np.cos(att[1])/np.cos(att[1])]])
 
     @property
     def position(self):

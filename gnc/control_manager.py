@@ -1,3 +1,5 @@
+import numpy as np
+
 from gnc.pid import PID
 
 
@@ -39,12 +41,12 @@ class AttitudeController(ControlManager):
     def __init__(self):
         super().__init__()
         self.roll_target = 0.0
-        self.pitch_target = 0.0
+        self.pitch_target = np.deg2rad(-1.0)
         self.yaw_target = 0.0
 
-        self.roll_pid = PID(kp=0.5, ki=0.0, kd=0.2)
-        self.yaw_pid = PID(kp=0.1, ki=0.0, kd=0.1)
-        self.pitch_pid = PID(kp=0.1, ki=0.0, kd=0.1)
+        self.roll_pid = PID(kp=2.5, ki=0.5, kd=1.5)
+        self.yaw_pid = PID(kp=0.5, ki=0.5, kd=0.5)
+        self.pitch_pid = PID(kp=0.5, ki=0.5, kd=0.2)
 
     def update(self, vehicle, simulation_manager):
         self.yaw_target = vehicle.yaw

@@ -1,4 +1,5 @@
 import copy
+from threading import Thread
 
 import numpy as np
 from vispy import app, gloo
@@ -9,9 +10,15 @@ from vehicles.components.simple_components import RectangularPrism
 from visualize.pimative_components import frag, vert, Arrow
 
 
-def plot_vehicle(vehicle, simulation_manager, sim_rate, sim_callback):
-    canvas = Canvas(vehicle, simulation_manager, sim_rate, sim_callback)
+def plot_vehicle(vehicles, simulation_manager, sim_rate):
+    Canvas(vehicles, simulation_manager, sim_rate)
     app.run()
+
+def world_to_camera():
+    return np.array([[1.0, 0.0, 0.0, 0.0],
+                     [0.0, 0.0, 1.0, 0.0],
+                     [0.0, 1.0, 0.0, 0.0],
+                     [0.0, 0.0, 0.0, 1.0]])
 
 def to_camera_frame(position):
     tmp = copy.deepcopy(position)
@@ -19,11 +26,17 @@ def to_camera_frame(position):
     position[2] = tmp[3]
     return position
 
+class Camera(object):
+    def __init__(self):
+        self.position = np.array([0.0, 0.0, 0.0])
+        self.target = np.array([1.0, 0.0, 0.0])
+
+
 # -----------------------------------------------------------------------------
 class Canvas(app.Canvas):
 
-    def __init__(self, vehicle, simulation_manager, sim_rate, sim_callback):
-        app.Canvas.__init__(self, keys='interactive', size=(800, 600))
+    def __init__(self, vehicle, simulation_manager, sim_rate):
+        app.Canvas.__init__(self, keys='interactive', size=(1600, 900))
 
         self.vehicle = vehicle
         self.simulation_manager = simulation_manager
@@ -31,6 +44,7 @@ class Canvas(app.Canvas):
         self.vertices_buffers = dict()
         self.filled_buffer = dict()
         self.outline_buffer = dict()
+        self.zoom = 20
 
         for component in vehicle.components:
             vertices, filled, outline = component.geom3d()
@@ -58,14 +72,12 @@ class Canvas(app.Canvas):
         gloo.set_polygon_offset(1, 1)
 
         self._timer = app.Timer(1/sim_rate, connect=self.on_timer, start=True)
-        self.sim_callback = sim_callback
         self.time = 0
 
         self.show()
 
     # ---------------------------------
     def on_timer(self, event):
-        self.sim_callback(1)
         self.update()
 
     # ---------------------------------
@@ -75,18 +87,25 @@ class Canvas(app.Canvas):
                                       float(event.size[1]), 2.0, 50.0)
         self.program['u_projection'] = self.projection
 
+    def on_mouse_wheel(self, event):
+        self.zoom -= event.delta[1]
+
+    def on_mouse_move(self, event):
+        if event.button == 2:
+            delta = event.position - event.last_event.position
+
     # ---------------------------------
     def on_draw(self, event):
         gloo.clear()
 
         veh_pos = self.vehicle.position
-        self.view = translate((-veh_pos[0], -veh_pos[1], -veh_pos[2]-20))
+        self.view = translate((-veh_pos[0], -veh_pos[1], -veh_pos[2]-self.zoom))
         self.program['u_view'] = self.view
 
         for ind in range(self.vehicle.num_components):
             comp_id = self.vehicle.components[ind].num_id
             force = self.vehicle.components[ind].force_vector
-            dcm =  (self.vehicle.body_transform @ self.vehicle.components[ind].body_to_component_transform ).T
+            dcm =  (self.vehicle.body_transform @ self.vehicle.components[ind].body_to_component_transform).T
             position = np.zeros(4)
             position[:3] = veh_pos + self.vehicle.body_transform @ self.vehicle.components[ind].position
             # position = to_camera_frame(position)

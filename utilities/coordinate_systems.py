@@ -11,7 +11,17 @@ def rotation_matrix(angles):
         pitch = angles[1]
         yaw = angles[2]
 
-        return Rotation.from_euler('ZYX', [yaw, pitch, roll]).as_matrix()
+        cy = np.cos(yaw)
+        sy = np.sin(yaw)
+        cp = np.cos(pitch)
+        sp = np.sin(pitch)
+        cr = np.cos(roll)
+        sr = np.sin(roll)
+
+        # return Rotation.from_euler('ZYX', [yaw, pitch, roll]).as_matrix()
+        return np.array([[cp*cy, cp*sy, -sp],
+                         [sr*sp*cy - cr*sy, sr*sp*sy + cr*cy, sr*cp],
+                         [cr*sp*cy + sr*sy, cr*sp*sy - sr*cy, cr*cp]]).T
 
 def euler_to_quaternion(angles):
     roll = angles[0]

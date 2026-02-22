@@ -338,6 +338,8 @@ class ThinPlate(Component):
             lift_dir = np.cross(-component_velocity/vel_mag, np.array([0, 1, 0]))
             drag_dir = -component_velocity/vel_mag
             alpha = np.rad2deg(alpha)
+            beta = np.arctan2(component_velocity[1], component_velocity[0])
+            vel_eff = vel_mag * np.cos(beta)
             if alpha <= -180:
                 alpha += 360
             if alpha > 180:
@@ -345,7 +347,7 @@ class ThinPlate(Component):
             cl, cd = self.aero_table[alpha]
             rho = environment_manager.air_properties()[0]
 
-            dyn_pres = 0.5 * rho * vel_mag ** 2 *self.chord*self.span
+            dyn_pres = 0.5 * rho * vel_eff ** 2 *self.chord*self.span
 
             drag = dyn_pres * cd * drag_dir
             lift = dyn_pres * cl * lift_dir
