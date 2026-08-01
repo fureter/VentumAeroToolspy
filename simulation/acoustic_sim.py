@@ -26,26 +26,47 @@ def simulate_2d_static_emitter_field(emitters, bounding_box, spatial_resolution,
     y = np.linspace(bounding_box[1,0], bounding_box[1,1], num_y, endpoint=True)
 
     x_mesh, y_mesh = np.meshgrid(x, y)
-    plt.figure(figsize=(16,9), dpi=72)
-    for ind, emitter in enumerate(emitters):
-        alpha = 2 * nu * (2*np.pi*emitter.base_frequency)**2/(3*rho*speed_of_sound**3)
-        distance = np.sqrt((x_mesh-emitter.position[0])**2 + (y_mesh-emitter.position[1])**2)
-        # distance = np.sqrt(x_mesh**2 + y_mesh**2)
-        time = distance/speed_of_sound + phase_offsets[ind]/(2*np.pi*emitter.base_frequency)
-        power = 10**(emitter.emit_power/10) * np.exp(-alpha * distance)
-        omega_t = 2*np.pi*emitter.base_frequency * time
-        wave_length = speed_of_sound / emitter.base_frequency
-        wave_number = 2*np.pi/wave_length
-        k_x = distance * wave_number
-        amplitude_field += np.cos(omega_t.T)*power.T
+    t_average = 10
+    for t_advance in np.linspace(0,1,t_average):
+        amplitude_field_local = np.zeros([num_x, num_y])
+        for ind, emitter in enumerate(emitters):
+            alpha = 2 * nu * (2*np.pi*emitter.base_frequency)**2/(3*rho*speed_of_sound**3)
+            distance = np.sqrt((x_mesh-emitter.position[0])**2 + (y_mesh-emitter.position[1])**2)
+            # distance = np.sqrt(x_mesh**2 + y_mesh**2)
+            time = distance/speed_of_sound + phase_offsets[ind] + t_advance
+            power = 10**(emitter.emit_power/10) * np.exp(-alpha * distance)
+            omega_t = 2*np.pi*emitter.base_frequency * time
+            wave_length = speed_of_sound / emitter.base_frequency
+            wave_number = 2*np.pi/wave_length
+            k_x = distance * wave_number
+            amplitude_field_local += np.cos(omega_t.T)*power.T
+        amplitude_field += np.abs(amplitude_field_local)
+    amplitude_field /= t_average
     # amplitude_field = 10*np.log10(amplitude_field)
 
-    plt.contourf(x, y, amplitude_field.T,  cmap=mpl.colormaps['seismic'], levels=64)
-    plt.colorbar()
+    plt.figure(figsize=(16,9), dpi=72)
+    plt.contourf(x, y, amplitude_field_local.T,  cmap=mpl.colormaps['seismic'], levels=64)
+    cbar = plt.colorbar()
+    cbar.set_label('Pressure (Pa)', rotation=270)
     for emitter in emitters:
         plt.scatter(emitter.position[0], emitter.position[1])
+        plt.title(title)
+    plt.grid()
     if output_dir is not None:
-        plt.savefig(os.path.join(output_dir, '%s.png' % title))
+        plt.savefig(os.path.join(output_dir, '%s_instantaneous.png' % title))
+    else:
+        plt.show()
+
+    plt.figure(figsize=(16,9), dpi=72)
+    plt.contourf(x, y, amplitude_field.T,  cmap=mpl.colormaps['seismic'], levels=64)
+    cbar = plt.colorbar()
+    cbar.set_label('Pressure (Pa)', rotation=270)
+    for emitter in emitters:
+        plt.scatter(emitter.position[0], emitter.position[1])
+        plt.title(title)
+    plt.grid()
+    if output_dir is not None:
+        plt.savefig(os.path.join(output_dir, '%s_psd.png' % title))
     else:
         plt.show()
 

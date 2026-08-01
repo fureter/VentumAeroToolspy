@@ -4,12 +4,29 @@ import logging
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from utilities.coordinate_systems import rotation_matrix
+from utilities.coordinate_systems import frd_dcm
 
+class DefaultVehicleLoggingKeys(object):
+    MASS = 'mass'
+
+    COM_X = 'center of mass x'
+    COM_Y = 'center of mass y'
+    COM_Z = 'center of mass z'
+    COM_KEYS = [COM_X, COM_Y, COM_Z]
+
+    INERTIA_XX = 'Intertia xx'
+    INERTIA_YY = 'Intertia yy'
+    INERTIA_ZZ = 'Intertia zz'
+    INERTIA_XY = 'Intertia xy'
+    INERTIA_XZ = 'Intertia xz'
+    INERTIA_YZ = 'Intertia yz'
+    INERTIA_KEYS = [INERTIA_XX, INERTIA_YY, INERTIA_ZZ, INERTIA_XY, INERTIA_XZ, INERTIA_YZ]
+
+    ALL_KEYS = [MASS, COM_X, COM_Y, COM_Z, INERTIA_XX, INERTIA_YY, INERTIA_ZZ, INERTIA_XY, INERTIA_XZ, INERTIA_YZ]
 
 class Vehicle(object):
 
-    def __init__(self, name, logger=None):
+    def __init__(self, name, data_logger):
         self.components = list()
         self.mass = 0.0
         self.center_of_mass = np.zeros(3)
@@ -19,6 +36,9 @@ class Vehicle(object):
         self.inertia_changed = False
         self.mass_changed = False
 
+        self.data_logger = data_logger
+        self.data_logger.register_items(DefaultVehicleLoggingKeys.ALL_KEYS)
+
         self.states = np.zeros(13) # Translational and angular positions and rates
         self.previous_states = np.zeros(13)
         self.force = np.zeros(3)
@@ -27,9 +47,6 @@ class Vehicle(object):
         self.num_components = 0
 
         self.name = name
-        if logger is None:
-            logger = logging.getLogger()
-        self._logger = logger
 
     def add_component(self, component):
         self.components.append(component)
@@ -83,6 +100,27 @@ class Vehicle(object):
     @abc.abstractmethod
     def control_input(self, control_manager):
         raise NotImplementedError('Not implemented for vehicle type')
+
+
+    def log_iteration(self, time):
+        self.data_logger.add_data(time, item=DefaultVehicleLoggingKeys.MASS, data=self.mass)
+        self.data_logger.add_data_items(time, items=DefaultVehicleLoggingKeys.COM_KEYS, datas=self.center_of_mass)
+        self.data_logger.add_data(time, item=DefaultVehicleLoggingKeys.INERTIA_XX, data=self.inertia[0,0])
+        self.data_logger.add_data(time, item=DefaultVehicleLoggingKeys.INERTIA_YY, data=self.inertia[1,1])
+        self.data_logger.add_data(time, item=DefaultVehicleLoggingKeys.INERTIA_ZZ, data=self.inertia[2,2])
+        self.data_logger.add_data(time, item=DefaultVehicleLoggingKeys.INERTIA_XY, data=self.inertia[0,1])
+        self.data_logger.add_data(time, item=DefaultVehicleLoggingKeys.INERTIA_XZ, data=self.inertia[0,2])
+        self.data_logger.add_data(time, item=DefaultVehicleLoggingKeys.INERTIA_YZ, data=self.inertia[1,2])
+
+    def plot_default_parameters(self):
+        self.data_logger.simple_plot(DefaultVehicleLoggingKeys.MASS, time_frame=None,
+                                     subplot=False)
+
+        self.data_logger.simple_plot(DefaultVehicleLoggingKeys.COM_KEYS, time_frame=None,
+                                     subplot=False)
+
+        self.data_logger.simple_plot(DefaultVehicleLoggingKeys.INERTIA_KEYS, time_frame=None,
+                                     subplot=False)
 
     @property
     def local_level_transform(self):
@@ -191,6 +229,12 @@ class Vehicle(object):
                          [self.q, -self.r, 0, self.p],
                          [self.r, self.q, -self.p, 0]])
 
+    @property
+    def inertia_tensor(self):
+        inertia = self.inertia
+        return np.array([[inertia[0,0], -inertia[0,1], -inertia[0,2]],
+                         [-inertia[1,0], inertia[1,1], -inertia[1,2]],
+                         [-inertia[2,0], -inertia[2,1], inertia[2,2]]])
 
     def log(self):
         for component in self.components:

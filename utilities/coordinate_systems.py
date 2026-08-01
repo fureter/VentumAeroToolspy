@@ -1,29 +1,38 @@
 import numpy as np
 import pyproj
-from scipy.spatial.transform import Rotation
 
 ECEF_PROJ = pyproj.CRS(proj='geocent', ellps='WGS84', datum='WGS84')
 LLA_PROJ = pyproj.CRS(proj='latlong', ellps='WGS84', datum='WGS84')
 
 
-def rotation_matrix(angles):
-        roll = angles[0]
-        pitch = angles[1]
-        yaw = angles[2]
+def frd_dcm(angles):
+    """
 
-        cy = np.cos(yaw)
-        sy = np.sin(yaw)
-        cp = np.cos(pitch)
-        sp = np.sin(pitch)
-        cr = np.cos(roll)
-        sr = np.sin(roll)
+    :param angles: Euler Roll Pitch Yaw angles in radians.
+    :return: 3x3 dcm rotating from FRD 'body' frame to inertial frame.
+    """
+    roll = angles[0]
+    pitch = angles[1]
+    yaw = angles[2]
 
-        # return Rotation.from_euler('ZYX', [yaw, pitch, roll]).as_matrix()
-        return np.array([[cp*cy, cp*sy, -sp],
-                         [sr*sp*cy - cr*sy, sr*sp*sy + cr*cy, sr*cp],
-                         [cr*sp*cy + sr*sy, cr*sp*sy - sr*cy, cr*cp]]).T
+    cy = np.cos(yaw)
+    sy = np.sin(yaw)
+    cp = np.cos(pitch)
+    sp = np.sin(pitch)
+    cr = np.cos(roll)
+    sr = np.sin(roll)
+
+    return np.array([[cp*cy, cp*sy, -sp],
+                     [sr*sp*cy - cr*sy, sr*sp*sy + cr*cy, sr*cp],
+                     [cr*sp*cy + sr*sy, cr*sp*sy - sr*cy, cr*cp]])
+
 
 def euler_to_quaternion(angles):
+    """
+
+    :param angles: Euler roll pitch yaw angles in radians.
+    :return:  4 element vector containing the quaternion terms for the given rotation. Scalar first notation.
+    """
     roll = angles[0]
     pitch = angles[1]
     yaw = angles[2]
@@ -37,6 +46,15 @@ def euler_to_quaternion(angles):
 
 
 def enu_to_ecef(lla, val):
+    """
+    Converts ECEF vector to ENU vector.
+
+    :param lla: Lat, Long, Alt vector in radians and meters
+    :param val: Vector value to rotate into ENU frame. Should be a relative vector value due to the relation of ENU to
+    ECEF.
+    i.e. velocity, accel, position difference.
+    :return: ENU rotation of val.
+    """
     lat = lla[0]
     lon = lla[1]
     clam = np.cos(lon)
@@ -49,6 +67,15 @@ def enu_to_ecef(lla, val):
     return dcm @ val
 
 def ecef_to_enu(lla, val):
+    """
+    Converts ENU vector to ECEF vector.
+
+    :param lla: Lat, Long, Alt vector in radians and meters
+    :param val: Vector value to rotate into ENU frame. Should be a relative vector value due to the relation of ENU to
+    ECEF.
+    i.e. velocity, accel, position difference.
+    :return: ENU rotation of val.
+    """
     lat = lla[0]
     lon = lla[1]
     clam = np.cos(lon)

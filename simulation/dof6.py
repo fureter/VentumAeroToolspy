@@ -4,6 +4,7 @@ from threading import Thread
 import numpy as np
 import scipy
 from scipy.spatial.transform import Rotation
+from vispy import app
 
 from utilities.coordinate_systems import euler_to_quaternion
 from vehicles import vehicle
@@ -21,6 +22,28 @@ def initialize_simulation(vehicles, control_manager, environment_manager, simula
         vehicles.update_inertia_and_mass()
         vehicles.move_origin_to_center_of_mass()
 
+def state_space_update(states, dt, force_b, mass, gravity_b, inertia_b, inv_inertia_b, ang_rate, omega_be_b, angular_momentum_be_b, moment_b,
+                       local_level_transform, att_rate_skew_matrix):
+    accel_b = force_b / mass + gravity_b - omega_be_b @ (local_level_transform.T @ states[3:6]) # TODO figure out later
+
+    ang_accel_b = inv_inertia_b @ (
+            -omega_be_b @ (inertia_b @ ang_rate + angular_momentum_be_b) + moment_b)
+
+    states[3:6] = states[3:6] + dt * local_level_transform @ accel_b
+    states[10:13] = states[10:13] + dt * ang_accel_b
+
+    states[0:3] = states[0:3] + dt * states[
+        3:6] + 0.5 * dt ** 2 * local_level_transform @ accel_b
+
+    lam = 1 - (np.sum(states[6:10] ** 2))
+    k = 0.5
+    states[6:10] = states[
+                       6:10] + 0.5 * dt * att_rate_skew_matrix @ states[
+                       6:10] + k * lam * states[
+                       6:10]
+    states[6:10] = states[6:10] / np.linalg.norm(states[6:10], ord=2)
+    return states
+
 def run_simulation(vehicles, control_manager, environment_manager, simulation_manager):
     while simulation_manager.simulate:
         environment_manager.update(vehicles, simulation_manager)
@@ -31,7 +54,7 @@ def run_simulation(vehicles, control_manager, environment_manager, simulation_ma
                                                                simulation_manager)
         angular_momentum_be_b = vehicles.calculate_angular_momentum_body_frame()
 
-        inertia_b = vehicles.inertia
+        inertia_b = vehicles.inertia_tensor
         inv_inertia_b = vehicles.inv_inertia
         local_level_transform = vehicles.local_level_transform
         body_transform = vehicles.body_transform
@@ -41,24 +64,11 @@ def run_simulation(vehicles, control_manager, environment_manager, simulation_ma
 
         omega_be_b = vehicles.omega_be_b
 
-        accel_b = force_b / vehicles.mass + gravity_b #- omega_be_b @ (body_transform @ vehicles.velocity) # TODO figure out later
+        vehicles.states = state_space_update(copy.deepcopy(vehicles.states), simulation_manager.dt, force_b,
+                                             vehicles.mass, gravity_b, inertia_b, inv_inertia_b, vehicles.ang_rate,
+                                             omega_be_b, angular_momentum_be_b, moment_b, local_level_transform,
+                                             vehicles.att_rate_skew_matrix)
 
-        ang_accel_b = inv_inertia_b @ (
-                -omega_be_b @ (inertia_b @ vehicles.ang_rate + angular_momentum_be_b) + moment_b)
-
-        vehicles.states[3:6] = vehicles.states[3:6] + simulation_manager.dt * local_level_transform @ accel_b
-        vehicles.states[10:13] = vehicles.states[10:13] + simulation_manager.dt * ang_accel_b
-
-        vehicles.states[0:3] = vehicles.states[0:3] + simulation_manager.dt * vehicles.states[
-                                                                            3:6] + 0.5 * simulation_manager.dt ** 2 * local_level_transform @ accel_b
-
-        lam = 1 - (np.sum(vehicles.states[6:10] ** 2))
-        k = 0.5
-        vehicles.states[6:10] = vehicles.states[
-                               6:10] + 0.5 * simulation_manager.dt * vehicles.att_rate_skew_matrix @ vehicles.states[
-                                                                                                    6:10] + k * lam * vehicles.states[
-                                                                                                                      6:10]
-        vehicles.states[6:10] = vehicles.states[6:10] / np.linalg.norm(vehicles.states[6:10], ord=2)
 
         simulation_manager.update(vehicles, control_manager, environment_manager)
         if vehicles.mass_changed or vehicles.inertia_changed:

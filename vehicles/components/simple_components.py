@@ -2,7 +2,7 @@ import numpy as np
 from astropy.coordinates.builtin_frames.itrs_observed_transforms import altaz_to_hadec_mat
 
 from aerodynamics.aero_lookup_table import AeroTable
-from utilities.coordinate_systems import rotation_matrix
+from utilities.coordinate_systems import frd_dcm
 from .components import  Component
 
 class HollowCylinder(Component):
@@ -151,7 +151,8 @@ class ThinPlate(Component):
                                                       344.92994,
                                                       350.01873,
                                                       355.03989,
-                                                      360.00000]), cl=np.array([0.00000,
+                                                      360.00000]),
+                                        cl=np.array([0.00000,
                                                                                 0.10659,
                                                                                 0.18073,
                                                                                 0.25736,
@@ -239,7 +240,8 @@ class ThinPlate(Component):
                                                                                 -0.72168,
                                                                                 -0.73665,
                                                                                 -0.42823,
-                                                                                0.00000]), cd=np.array([0.02331,
+                                                                                0.00000]),
+                                        cd=np.array([0.02331,
                                                                                                         0.04492,
                                                                                                         0.03388,
                                                                                                         0.03858,
@@ -362,9 +364,6 @@ class ThinPlate(Component):
 
             self.force_vector = force
             self.force_vector_hist.append(force)
-            self.force_mag = np.linalg.norm(force,ord=2)
-            self.force_ang = np.array([0, np.arctan2(force[2], np.linalg.norm(force[0:2], ord=2)),np.arctan2(force[1], force[0])])
-            self.force_dcm = rotation_matrix(self.force_ang)
             return force, moment
 
         def calculate_angular_momentum_body_frame(self, body_rate):
