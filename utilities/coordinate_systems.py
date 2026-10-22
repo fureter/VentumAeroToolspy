@@ -26,6 +26,17 @@ def frd_dcm(angles):
                      [sr*sp*cy - cr*sy, sr*sp*sy + cr*cy, sr*cp],
                      [cr*sp*cy + sr*sy, cr*sp*sy - sr*cy, cr*cp]])
 
+def get_frd_az_el(r_hat):
+    """
+
+    :param r_hat:
+    :return:
+    """
+    az, el = 0.0, 0.0
+
+    # Todo complete
+
+    return az, el
 
 def euler_to_quaternion(angles):
     """
