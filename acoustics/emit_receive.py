@@ -2,18 +2,8 @@ import abc
 
 import numpy as np
 
+from antennas.antenna_pattern import AntennaPattern
 from utilities import coordinate_systems
-
-class AcousticPattern(object):
-    def __init__(self, gain, freq, az, el):
-        self.gain = gain
-        self.freq = freq
-        self.az = az
-        self.el = el
-
-    @staticmethod
-    def generate_ideal_array():
-        pass
 
 class Emitter(object):
     def __init__(self, init_position, init_attitude, emit_power, frequency, antenna_pattern):
@@ -30,35 +20,30 @@ class Microphone(object):
         self.antenna_pattern = antenna_pattern
 
 class ElementArray(abc.ABC):
-    def __init__(self, elements):
+    def __init__(self, elements=None, array_pattern=None):
         self.elements = elements
-        self.num_elem = len(elements)
+
+        if elements is not None and array_pattern is None:
+            self.array_pattern = AntennaPattern.from_elements(self.elements)
+        elif elements is None and array_pattern is None:
+            raise ValueError('Must specify at least one: elements or antenna_pattern')
+
+        self.array_pattern = array_pattern
+        self.num_elem = len(elements) if elements is not None else array_pattern.num_elem
 
         self.array_position = np.zeros(3)
         self.array_velocity = np.zeros(3)
         self.array_acceleration = np.zeros(3)
         self.array_attitude = np.zeros(3)
+        self.last_excitation = None
 
-    def array_phase_offsets(self, az, el, frequency_range, speed_of_sound, phase_offsets=None):
-        if phase_offsets is None:
-            phase_offsets = np.zeros(self.num_elem)
+    def get_array_response(self, az, el, frequency_range):
+        return self.array_pattern.get_antenna_response(az, el, frequency_range)
 
-        phase_delays = np.zeros([frequency_range.shape[0], self.num_elem])
-        for elem in range(self.num_elem):
-            wave_len = speed_of_sound / frequency_range
-            phase_delays[:, elem] = phase_offsets[elem] + 2*np.pi*self.elements[elem].position @ np.array([[np.sin(np.pi/2 - el)*np.cos(az)],
-                                                                                                   [np.sin(np.pi/2 - el)*np.sin(az)],
-                                                                                                   [np.cos(el)]])/wave_len
-
-        return phase_delays
-
-    def apply_phase_delays(self, frequency_range, phase_delays, waveform):
-        adjusted_waveform = np.zeros([frequency_range.shape[0], self.num_elem, waveform.data.shape[0]])
-
-        wfm_fft, fft_freq = waveform.fft
-
-
-        return adjusted_waveform
+    def get_array_response_with_excitation(self, az, el, frequency_range):
+        if self.last_excitation is None:
+            self.last_excitation = np.zeros(self.num_elem, dtype=np.complex128)
+        return self.last_excitation.conj().T @ self.array_pattern.get_antenna_response(az, el, frequency_range)
 
 
 class EmitterArray(ElementArray):
@@ -77,10 +62,19 @@ class MicrophoneArray(ElementArray):
                 r_hat = r / np.linalg.norm(r, ord=2)
                 r_hat_array_body = coordinate_systems.frd_dcm(self.array_position) @ r_hat
                 az, el = coordinate_systems.get_frd_az_el(r_hat_array_body)
-                phase_delays = self.array_phase_offsets(az, el, frequency_range, speed_of_sound)
+                response = self.get_array_response(az, el, frequency_range)
 
 
             elif isinstance(emitter, EmitterArray):
-                pass
+                r = emitter.array_position - self.array_position
+                r_hat = r / np.linalg.norm(r, ord=2)
+                r_hat_array_body = coordinate_systems.frd_dcm(self.array_attitude) @ r_hat
+                az, el = coordinate_systems.get_frd_az_el(r_hat_array_body)
+                response = self.get_array_response(az, el, frequency_range)
+                r_hat_emitter_body = coordinate_systems.frd_dcm(emitter.array_attitude) @ -r_hat
+                emitter_az, emitter_el = coordinate_systems.get_frd_az_el(r_hat_emitter_body)
+                emitter_response = emitter.get_array_response_with_excitation(emitter_az, emitter_el, frequency_range)
+
+
 
         return covar

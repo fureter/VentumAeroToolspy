@@ -4,6 +4,14 @@ import matplotlib.pyplot as plt
 from scipy.fftpack import fft
 import numpy as np
 
+def plot_waveform_signal(waveform, show=True, output_dir=None):
+    plt.figure()
+    t = np.linspace(0, waveform.samples/waveform.sampling_frequency, waveform.samples)
+    plt.plot(t, waveform.data)
+    plt.grid(True)
+    if show:
+        plt.show()
+
 def plot_waveform_fft(waveform, show=True, output_dir=None):
     plt.figure()
     n = waveform.data.shape[0]
@@ -18,16 +26,13 @@ def plot_waveform_fft(waveform, show=True, output_dir=None):
     if show:
         plt.show()
 
-def plot_waveform_periodgram(waveform, show=True, output_dir=None):
+def plot_waveform_periodgram(waveform, show=True, flim=None, output_dir=None):
     plt.figure()
-    f, Pxx_den = signal.periodogram(1E4*waveform.data, waveform.sampling_frequency, return_onesided=True,
-                                    scaling='density')
-    sorted_indices = np.argsort(f)
-    plt.plot(f[sorted_indices]/1E6, 10*np.log10(Pxx_den[sorted_indices]))
-    plt.xlim([-20, 20])
-    plt.ylim([-50, 20])
-    plt.xlabel('frequency [MHz]')
-    plt.ylabel('PSD dB[V**2/Hz]')
-    plt.grid()
+    p, freqs = plt.psd(waveform.data,NFFT=2**16, Fs=waveform.sampling_frequency, noverlap=2**15)
+    plt.xlabel('frequency [Hz]')
+    plt.ylabel('PSD (dB/Hz))')
+    if flim is not None:
+        plt.xlim(flim)
+    plt.grid(True)
     if show:
         plt.show()
