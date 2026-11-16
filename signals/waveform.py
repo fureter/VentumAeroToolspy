@@ -11,6 +11,7 @@ class Waveform(object):
         self.sampling_frequency = None
         self.samples = None
         self.data = None
+        self.time = None
 
     @property
     def rfft(self):
@@ -39,7 +40,7 @@ class Waveform(object):
         self.sampling_frequency = sampling_freq
 
     def freq_shift(self, frequency_shift):
-        self.data *= np.exp(2j*np.pi*frequency_shift*np.linspace(0, self.samples/self.sampling_frequency, self.samples))
+        self.data *= np.exp(2j*np.pi*frequency_shift*self.time)
 
     def bandpass_filter(self, freq_bottom, freq_top):
         fft_data, fft_freqs = self.fft
@@ -57,6 +58,9 @@ class Waveform(object):
     def correlation(self, waveform):
         return np.correlate(self.data, waveform.data)[0]/self.samples
 
+    def coherent_correlation(self, waveform):
+        return np.sum(np.multiply(self.data, waveform.data))
+
     def adjust_power(self, power):
         self.data = 10 ** (power / 10) / np.mean(abs(self.data) ** 2) * self.data
 
@@ -64,6 +68,7 @@ class Waveform(object):
         wfm = Waveform()
         wfm.sampling_frequency = self.sampling_frequency
         wfm.samples = self.samples
+        wfm.time = np.linspace(0, wfm.samples/wfm.sampling_frequency, wfm.samples)
         wfm.data = self.data + other.data
         return wfm
 
@@ -73,6 +78,7 @@ class Waveform(object):
         waveform.data = np.zeros(time.shape[0])
         waveform.samples = time.shape[0]
         waveform.sampling_frequency = 1.0/dt
+        waveform.time = np.linspace(0, waveform.samples/waveform.sampling_frequency, waveform.samples)
         for freq, amp in zip(frequencies, amplitude):
             waveform.data += amp * np.sin(2.0*np.pi*freq * time)
         return waveform
@@ -88,6 +94,7 @@ class Waveform(object):
         waveform= Waveform()
         waveform.samples = samples
         waveform.sampling_frequency = sampling_freq
+        waveform.time = np.linspace(0, waveform.samples/waveform.sampling_frequency, waveform.samples)
         bit_sequence[bit_sequence == 0] = -1
         waveform.data = np.complex128(bit_sequence[:samples]*np.cos(2.0*np.pi*carrier_freq * np.linspace(0,time,samples)))
 
@@ -98,6 +105,7 @@ class Waveform(object):
         waveform= Waveform()
         waveform.samples = int(time*sampling_frequency)
         waveform.sampling_frequency = sampling_frequency
+        waveform.time = np.linspace(0, waveform.samples/waveform.sampling_frequency, waveform.samples)
         waveform.data = np.random.normal(0.0, 1, waveform.samples)
         waveform.bandpass_filter(center_freq - bw/2, center_freq + bw/2)
         waveform.data = 10**(power/10) / np.mean(abs(waveform.data)**2) * waveform.data
@@ -117,11 +125,11 @@ class Waveform(object):
         waveform.data = np.zeros(samples, dtype=np.complex128)
         waveform.sampling_frequency = sampling_freq
         waveform.samples = samples
+        waveform.time = np.linspace(0, waveform.samples/waveform.sampling_frequency, waveform.samples)
         bit_sequence[bit_sequence == 0] = -1
         waveform.data = np.exp(1j*bit_sequence[:samples] * np.sign(np.sin(2.0*np.pi*subcarrier_freq * np.linspace(0,time,samples))))
 
         return waveform
-
 def gps_ca(s1, s2):
     """
     https://www.gaussianwaves.com/2015/06/gold-code-generator/
@@ -136,18 +144,43 @@ def gps_ca(s1, s2):
     return np.array(out)
 
 class NavigationWaveform(Waveform):
-    CODE_DEFINITION = {'CA': []}
+    """
+
+    """
+
+    """Sequence preferred pairs from Table 3-Ia in IS-GPS-200"""
+    CA_PRN_PAIRS = {1: (2,6), 2: (3,7), 3: (4,8), 4: (5,9), 5: (1,9), 6: (2,10), 7: (1,8), 8: (2,9), 9:(3,10) ,
+                    10:(2,3), 11: (3,4), 12: (5,6), 13: (6,7), 14: (7,8), 15: (8,9), 16: (9,10), 17: (1,4), 18: (2,5),
+                    19: (3,6), 20: (4,7), 21: (5,8), 22: (6,9), 23: (1,3), 24: (4,6), 25: (5,7), 26: (6,8), 27: (7,9),
+                    28: (8,10), 29: (1,6), 30: (2,7), 31: (3,8), 32: (4,9)}
+
+    CODE_DEFINITION = {'CA': {'chip_duration': 1/1.023E6},
+                       'P': {'chip_duration': 1/10.23E6}}
+
+    CHIP_SEQUENCES = {'CA': {}}
+    for prn, pair in CA_PRN_PAIRS.items():
+        CHIP_SEQUENCES['CA'][prn] = gps_ca(pair[0], pair[1])
+
     def __init__(self, data_bits, chip_duration):
         self.sampling_frequency = None
         self.samples = None
         self.data = None
+        data_bits[data_bits == 0] = -1.0
         self.data_bits = data_bits
         self.chip_duration = chip_duration
         self.rel_time = np.linspace(0, len(data_bits)*chip_duration, len(data_bits))
 
     def get_bit(self, time_into_sequence):
-        return self.data_bits[np.argmax(self.rel_time >= time_into_sequence)]
+        return self.data_bits[np.argmax(self.rel_time >= time_into_sequence)-1]
 
     @staticmethod
-    def bpsk(samples, sampling_freq, carrier_freq, chipping_freq, code_type, prn, ):
-
+    def bpsk(samples, sampling_freq, carrier_freq, code_type, prn, gps_time_start):
+        data_bits = NavigationWaveform.CHIP_SEQUENCES[code_type][prn]
+        wfm = NavigationWaveform(data_bits, NavigationWaveform.CODE_DEFINITION[code_type]['chip_duration'])
+        wfm.sampling_frequency = sampling_freq
+        wfm.samples = samples
+        wfm.time = np.linspace(0, wfm.samples/wfm.sampling_frequency, wfm.samples)
+        wfm.data = np.zeros(samples, dtype=np.complex128)
+        for sample_ind in range(samples):
+            wfm.data[sample_ind] = wfm.get_bit((gps_time_start+wfm.time[sample_ind])%(wfm.chip_duration*len(wfm.data_bits)))*np.cos(2.0*np.pi*carrier_freq * (gps_time_start+wfm.time[sample_ind]))
+        return wfm
